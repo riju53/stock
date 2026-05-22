@@ -6,6 +6,7 @@ import streamlit as st
 from datetime import datetime
 import plotly.graph_objects as go
 import pandas as pd
+import time
 
 from langchain_groq import ChatGroq
 from langchain.tools import tool
@@ -85,21 +86,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
 # =========================================
-# API KEYS
+# API KEYS (Using hardcoded for now - but better to use secrets)
 # =========================================
 
-# Use Streamlit secrets in production
-if 'GROQ_API_KEY' not in st.secrets:
-    st.warning("Please set up your API keys in Streamlit secrets")
-
-os.environ["GROQ_API_KEY"] = st.secrets.get("GROQ_API_KEY", "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")
+# Set your Groq API key
+GROQ_API_KEY = "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"
+os.environ["GROQ_API_KEY"] = GROQ_API_KEY
 
 # Finnhub API
-FINNHUB_API_KEY = st.secrets.get("FINNHUB_API_KEY", "d87h1n1r01qmhakfpangd87h1n1r01qmhakfpao0")
+FINNHUB_API_KEY = "d87h1n1r01qmhakfpangd87h1n1r01qmhakfpao0"
 
 # AlphaVantage API
-ALPHA_VANTAGE_API_KEY = st.secrets.get("ALPHA_VANTAGE_API_KEY", "EXKT5UJD09F47WBW")
+ALPHA_VANTAGE_API_KEY = "EXKT5UJD09F47WBW"
+
 
 # =========================================
 # LLM MODEL
@@ -107,12 +108,18 @@ ALPHA_VANTAGE_API_KEY = st.secrets.get("ALPHA_VANTAGE_API_KEY", "EXKT5UJD09F47WB
 
 @st.cache_resource
 def get_model():
-    return ChatGroq(
-        model="openai/gpt-oss-120b",
-        temperature=0.7
-    )
+    try:
+        return ChatGroq(
+            model="mixtral-8x7b-32768",  # Changed to a more stable model
+            temperature=0.7,
+            groq_api_key=GROQ_API_KEY
+        )
+    except Exception as e:
+        st.error(f"Error initializing model: {str(e)}")
+        return None
 
 model = get_model()
+
 
 # =========================================
 # TOOLS
@@ -122,75 +129,84 @@ model = get_model()
 def get_stock_price(symbol: str):
     """Get USA stock price with detailed metrics."""
     
-    url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
-    
     try:
+        url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={FINNHUB_API_KEY}"
         response = requests.get(url, timeout=10)
         data = response.json()
 
-        if "c" not in data:
-            return f"❌ Unable to fetch stock price for {symbol}"
+        if "c" not in data or data.get('c') is None:
+            return f"❌ Unable to fetch stock price for {symbol.upper()}. Please check the symbol."
 
         # Calculate change and change percent
-        change = data.get('c', 0) - data.get('pc', 0)
-        change_percent = (change / data.get('pc', 1)) * 100
+        current = data.get('c', 0)
+        previous = data.get('pc', current)
+        change = current - previous
+        change_percent = (change / previous * 100) if previous != 0 else 0
         
         return f"""
 📊 **Stock Analysis for {symbol.upper()}** 📊
 
-💰 **Current Price:** ${data.get('c', 'N/A')}
-📈 **Day's Range:** ${data.get('l', 'N/A')} - ${data.get('h', 'N/A')}
-📉 **Open:** ${data.get('o', 'N/A')}
-🔙 **Previous Close:** ${data.get('pc', 'N/A')}
-🔄 **Change:** ${change:.2f} ({change_percent:.2f}%)
+💰 **Current Price:** ${current:.2f}
+📈 **Day's Range:** ${data.get('l', 0):.2f} - ${data.get('h', 0):.2f}
+📉 **Open:** ${data.get('o', 0):.2f}
+🔙 **Previous Close:** ${previous:.2f}
+🔄 **Change:** ${change:.2f} ({change_percent:+.2f}%)
+📊 **Volume:** {data.get('v', 0):,}
 
-💡 **Analysis:**
-- {'📈 Bullish' if change > 0 else '📉 Bearish'} movement today
-- Volume: {data.get('v', 'N/A'):,}
-- Market Status: {'Active' if data.get('c') else 'Check trading hours'}
+💡 **Quick Analysis:**
+- {'📈 Bullish signal - Price increased' if change > 0 else '📉 Bearish signal - Price decreased'}
+- {'🔥 High volatility' if (data.get('h', 0) - data.get('l', 0)) / current > 0.02 else '📊 Normal trading range'}
         """
 
+    except requests.exceptions.RequestException as e:
+        return f"❌ Network error fetching stock data: {str(e)}"
     except Exception as e:
         return f"❌ Error fetching stock data: {str(e)}"
+
 
 @tool
 def get_indian_stock_price(symbol: str):
     """Get Indian stock market price with comprehensive details."""
     
-    url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={ALPHA_VANTAGE_API_KEY}"
-    
     try:
+        # Remove .BSE if present for API call
+        clean_symbol = symbol.replace('.BSE', '')
+        url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={clean_symbol}.BSE&apikey={ALPHA_VANTAGE_API_KEY}"
+        
         response = requests.get(url, timeout=10)
         data = response.json()
 
         if "Global Quote" not in data or not data["Global Quote"]:
-            return f"❌ Unable to fetch Indian stock data for {symbol}"
+            return f"❌ Unable to fetch Indian stock data for {symbol.upper()}. Please check the symbol."
 
         quote = data["Global Quote"]
         
         current_price = float(quote.get('05. price', 0))
         previous_close = float(quote.get('08. previous close', 1))
         change = current_price - previous_close
-        change_percent = (change / previous_close) * 100
+        change_percent = (change / previous_close * 100) if previous_close != 0 else 0
 
         return f"""
 📊 **Stock Analysis for {symbol.upper()}** 📊
 
 💰 **Current Price:** ₹{current_price:,.2f}
-📈 **Day's Range:** ₹{quote.get('03. high', 'N/A')} - ₹{quote.get('04. low', 'N/A')}
-📉 **Open:** ₹{quote.get('02. open', 'N/A')}
+📈 **Day's High:** ₹{float(quote.get('03. high', 0)):,.2f}
+📉 **Day's Low:** ₹{float(quote.get('04. low', 0)):,.2f}
 🔙 **Previous Close:** ₹{previous_close:,.2f}
 🔄 **Change:** ₹{change:,.2f} ({change_percent:+.2f}%)
 📊 **Volume:** {int(float(quote.get('06. volume', 0))):,}
-📈 **YTD Change:** {quote.get('10. change percent', 'N/A')}
+📈 **Change Percent:** {quote.get('10. change percent', 'N/A')}
 
 💡 **Market Sentiment:**
 - {'📈 Positive momentum' if change > 0 else '📉 Negative momentum'}
 - {'🔥 High volume activity' if int(float(quote.get('06. volume', 0))) > 1000000 else '📊 Normal trading volume'}
         """
 
+    except requests.exceptions.RequestException as e:
+        return f"❌ Network error fetching Indian stock data: {str(e)}"
     except Exception as e:
         return f"❌ Error fetching Indian stock data: {str(e)}"
+
 
 @tool
 def get_company_details(company_name: str):
@@ -200,43 +216,43 @@ def get_company_details(company_name: str):
 🏢 **Company Analysis: {company_name.upper()}** 🏢
 
 ### 📋 Company Overview
-- **Core Business:** Primary products and services
-- **Market Position:** Industry leadership and competitive advantages
-- **Global Presence:** International operations and reach
+- **Core Business:** Primary products and services in their industry
+- **Market Position:** Competitive advantages and market leadership
+- **Global Presence:** International operations and market reach
 
 ### 👥 Leadership & Management
-- **CEO & Executive Team:** Track record and vision
+- **Executive Team:** Experience and track record
 - **Corporate Governance:** Transparency and shareholder relations
 
-### 💼 Financial Health
+### 💼 Financial Health Indicators
 - **Revenue Streams:** Diversification and stability
-- **Profitability:** Margins and efficiency metrics
-- **Growth Metrics:** Revenue growth, market share expansion
+- **Profitability:** Margin analysis and efficiency
+- **Growth Metrics:** Historical and projected growth
 
 ### 🚀 Growth Opportunities
-1. **New Markets:** Geographic and demographic expansion
-2. **Innovation:** R&D investments and product pipeline
-3. **Strategic Partnerships:** Joint ventures and collaborations
-4. **Digital Transformation:** Technology adoption and efficiency
+1. Market expansion possibilities
+2. Product innovation pipeline
+3. Strategic partnerships
+4. Digital transformation initiatives
 
-### ⚠️ Risk Factors
-- **Market Risks:** Competition and regulatory changes
-- **Operational Risks:** Supply chain and execution challenges
-- **Financial Risks:** Debt levels and currency fluctuations
-- **External Risks:** Economic cycles and geopolitical factors
+### ⚠️ Risk Factors to Consider
+- Market competition
+- Regulatory changes
+- Economic cycles
+- Operational challenges
 
 ### 💎 Investment Insights
-- **Short-term Outlook (0-12 months):** Catalysts and headwinds
-- **Medium-term Growth (1-3 years):** Expansion plans
-- **Long-term Potential (3-5+ years):** Industry transformation
+- **Short-term (0-12 months):** Key catalysts and events to watch
+- **Medium-term (1-3 years):** Growth trajectory and milestones
+- **Long-term (3-5+ years):** Industry trends and positioning
 
 ### 🎯 Key Metrics to Monitor
-- Earnings reports and guidance
+- Quarterly earnings reports
 - Market share trends
-- Customer acquisition costs
-- Product innovation pipeline
-- ESG performance metrics
+- Customer satisfaction metrics
+- R&D investment levels
 """
+
 
 # =========================================
 # AGENT PROMPT
@@ -249,8 +265,7 @@ You are an expert stock market advisor with deep knowledge of both Indian and US
 - Stock price analysis and technical indicators
 - Fundamental analysis and company valuation
 - Market trends and sector performance
-- Risk assessment and portfolio management
-- Investment strategies for different time horizons
+- Risk assessment and investment strategies
 
 **When analyzing stocks, always provide:**
 1. Current price and key metrics
@@ -258,17 +273,18 @@ You are an expert stock market advisor with deep knowledge of both Indian and US
 3. Company fundamentals
 4. Growth opportunities
 5. Risk factors
-6. Investment insights with timeframes
+6. Investment insights
 
 **Response Style:**
 - Be professional but enthusiastic
 - Use emojis for visual appeal
 - Provide actionable insights
 - Include both opportunities and risks
-- Give clear recommendations with reasoning
+- Give clear, balanced recommendations
 
 Always use available tools to fetch real-time data before providing analysis.
 """
+
 
 # =========================================
 # CREATE AGENT
@@ -276,17 +292,34 @@ Always use available tools to fetch real-time data before providing analysis.
 
 @st.cache_resource
 def get_agent():
-    return create_react_agent(
-        model=model,
-        tools=[
-            get_stock_price,
-            get_indian_stock_price,
-            get_company_details
-        ],
-        prompt=prompt
-    )
+    if model is None:
+        return None
+    try:
+        return create_react_agent(
+            model=model,
+            tools=[
+                get_stock_price,
+                get_indian_stock_price,
+                get_company_details
+            ],
+            prompt=prompt
+        )
+    except Exception as e:
+        st.error(f"Error creating agent: {str(e)}")
+        return None
 
 agent = get_agent()
+
+
+# =========================================
+# INITIALIZE SESSION STATE
+# =========================================
+
+if 'stock_name' not in st.session_state:
+    st.session_state['stock_name'] = "TCS"
+if 'market' not in st.session_state:
+    st.session_state['market'] = "Indian Stock"
+
 
 # =========================================
 # SIDEBAR
@@ -323,7 +356,7 @@ with st.sidebar:
     with st.expander("🇮🇳 Indian Stocks", expanded=True):
         indian_stocks = ["TCS", "INFY", "RELIANCE", "HDFCBANK", "ICICIBANK", "WIPRO"]
         for stock in indian_stocks:
-            if st.button(f"📈 {stock}.BSE", key=f"ind_{stock}", use_container_width=True):
+            if st.button(f"📈 {stock}", key=f"ind_{stock}", use_container_width=True):
                 st.session_state['stock_name'] = stock
                 st.session_state['market'] = "Indian Stock"
     
@@ -336,23 +369,15 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Market Sentiment
-    st.markdown("### 🎯 Market Sentiment")
-    sentiment = st.select_slider(
-        "Current Market Mood",
-        options=["Bearish 🐻", "Neutral 😐", "Bullish 🐂"],
-        value="Neutral 😐"
-    )
-    
-    st.markdown("---")
-    
     # Footer
     st.markdown("""
     <div style="text-align: center; padding: 1rem; font-size: 0.8rem;">
         <p>Built with ❤️ by Tathagata Nath</p>
         <p>Data from Finnhub & AlphaVantage</p>
+        <p>⚠️ Not financial advice</p>
     </div>
     """, unsafe_allow_html=True)
+
 
 # =========================================
 # MAIN CONTENT
@@ -392,134 +417,111 @@ with col3:
 # Info Box
 st.markdown("""
 <div class="info-box">
-    💡 <strong>Pro Tip:</strong> Use proper suffixes - .BSE for Indian stocks (e.g., TCS.BSE, INFY.BSE) or just the symbol for US stocks (e.g., AAPL, TSLA)
+    💡 <strong>Pro Tip:</strong> For Indian stocks, use just the company name (e.g., TCS, INFY). For US stocks, use the symbol (e.g., AAPL, TSLA).
 </div>
 """, unsafe_allow_html=True)
 
 # Analysis Section
 if analyze_button:
-    with st.spinner("🤖 AI Agent analyzing stock data..."):
-        try:
-            # Prepare symbol based on market
-            if market == "Indian Stock":
-                symbol = f"{stock_name}.BSE" if not stock_name.endswith('.BSE') else stock_name
-                user_query = f"""
-                Give complete stock analysis of {symbol}
-                Include current price, company overview, investment insights, and future growth opportunities.
-                """
-            else:
-                symbol = stock_name.upper()
-                user_query = f"""
-                Give complete stock analysis of {symbol}
-                Include current price, company overview, investment insights, and future growth opportunities.
-                """
-            
-            # Progress bar
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            status_text.text("📊 Fetching stock data...")
-            progress_bar.progress(25)
-            
-            # Agent Invocation
-            response = agent.invoke({"messages": [("user", user_query)]})
-            
-            status_text.text("🤔 Analyzing market trends...")
-            progress_bar.progress(50)
-            
-            status_text.text("💡 Generating investment insights...")
-            progress_bar.progress(75)
-            
-            # Final Output
-            final_response = response["messages"][-1].content
-            
-            status_text.text("✅ Analysis complete!")
-            progress_bar.progress(100)
-            
-            # Clear progress indicators
-            progress_bar.empty()
-            status_text.empty()
-            
-            # Success animation
-            st.balloons()
-            
-            # Display results in styled containers
-            st.markdown("""
-            <div class="success-box">
-                ✅ Analysis Complete! Here's your comprehensive stock report:
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Create tabs for better organization
-            tab1, tab2, tab3 = st.tabs(["📊 Stock Analysis", "💼 Investment Insights", "🎯 Action Plan"])
-            
-            with tab1:
-                st.markdown(final_response)
-            
-            with tab2:
-                st.info("""
-                ### 💡 Key Investment Takeaways
+    if agent is None:
+        st.error("❌ Agent initialization failed. Please check your API keys and try again.")
+    else:
+        with st.spinner("🤖 AI Agent analyzing stock data..."):
+            try:
+                # Prepare symbol based on market
+                if market == "Indian Stock":
+                    symbol = stock_name.upper()
+                    user_query = f"""
+                    Give complete stock analysis of {symbol} stock from Indian market.
+                    Use get_indian_stock_price tool to fetch current price.
+                    Use get_company_details tool for company information.
+                    Include investment insights and future growth opportunities.
+                    """
+                else:
+                    symbol = stock_name.upper()
+                    user_query = f"""
+                    Give complete stock analysis of {symbol} stock from USA market.
+                    Use get_stock_price tool to fetch current price.
+                    Use get_company_details tool for company information.
+                    Include investment insights and future growth opportunities.
+                    """
                 
-                Based on the analysis above:
-                - **Risk Level:** Consider your investment horizon and risk tolerance
-                - **Entry Points:** Look for support levels mentioned in analysis
-                - **Diversification:** Don't put all eggs in one basket
-                - **Regular Review:** Monitor quarterly results and market trends
-                """)
-            
-            with tab3:
-                st.success("""
-                ### 🎯 Recommended Action Steps
+                # Progress indicators
+                progress_bar = st.progress(0)
+                status_text = st.empty()
                 
-                1. **Research:** Deep dive into company's annual reports
-                2. **Monitor:** Set price alerts for key levels
-                3. **Plan:** Define entry and exit strategies
-                4. **Execute:** Start with small position to test
-                5. **Review:** Regular portfolio rebalancing
-                """)
-            
-            # Add download option
-            st.download_button(
-                label="📥 Download Analysis Report",
-                data=final_response,
-                file_name=f"{symbol}_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                mime="text/plain"
-            )
-            
-        except Exception as e:
-            st.error(f"❌ Analysis Error: {str(e)}")
-            st.info("💡 Please check your stock symbol and try again. For Indian stocks, use format: TCS.BSE, INFY.BSE")
-
-# Market News Section
-st.markdown("---")
-st.markdown("### 📰 Market Insights")
-
-with st.expander("📈 Today's Market Overview", expanded=False):
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.metric(
-            label="🇮🇳 NIFTY 50",
-            value="19,500",
-            delta="+0.85%",
-            delta_color="normal"
-        )
-    
-    with col2:
-        st.metric(
-            label="🇺🇸 S&P 500",
-            value="4,500",
-            delta="+0.45%",
-            delta_color="normal"
-        )
-    
-    with col3:
-        st.metric(
-            label="🌍 Global Sentiment",
-            value="Cautiously Optimistic",
-            delta="Stable",
-            delta_color="off"
-        )
+                status_text.text("📊 Fetching stock data...")
+                progress_bar.progress(25)
+                time.sleep(0.5)
+                
+                # Agent Invocation
+                response = agent.invoke({"messages": [("user", user_query)]})
+                
+                status_text.text("🤔 Analyzing market trends...")
+                progress_bar.progress(50)
+                time.sleep(0.5)
+                
+                status_text.text("💡 Generating investment insights...")
+                progress_bar.progress(75)
+                time.sleep(0.5)
+                
+                # Final Output
+                final_response = response["messages"][-1].content
+                
+                status_text.text("✅ Analysis complete!")
+                progress_bar.progress(100)
+                
+                # Clear progress indicators
+                time.sleep(0.5)
+                progress_bar.empty()
+                status_text.empty()
+                
+                # Display results in styled containers
+                st.markdown("""
+                <div class="success-box">
+                    ✅ Analysis Complete! Here's your comprehensive stock report:
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Create tabs for better organization
+                tab1, tab2, tab3 = st.tabs(["📊 Stock Analysis", "💼 Investment Insights", "🎯 Action Plan"])
+                
+                with tab1:
+                    st.markdown(final_response)
+                
+                with tab2:
+                    st.info("""
+                    ### 💡 Key Investment Takeaways
+                    
+                    Based on the analysis above, consider:
+                    - **Risk Assessment:** Align with your risk tolerance
+                    - **Entry Strategy:** Look for support levels
+                    - **Portfolio Fit:** Ensure proper diversification
+                    - **Regular Monitoring:** Track key metrics quarterly
+                    """)
+                
+                with tab3:
+                    st.success("""
+                    ### 🎯 Recommended Next Steps
+                    
+                    1. **Due Diligence:** Review company financials and reports
+                    2. **Price Alerts:** Set notifications for key levels
+                    3. **Position Sizing:** Start with appropriate allocation
+                    4. **Exit Strategy:** Define stop-loss and profit targets
+                    5. **Review Schedule:** Plan periodic portfolio reviews
+                    """)
+                
+                # Add download option
+                st.download_button(
+                    label="📥 Download Analysis Report",
+                    data=final_response,
+                    file_name=f"{symbol}_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                    mime="text/plain"
+                )
+                
+            except Exception as e:
+                st.error(f"❌ Analysis Error: {str(e)}")
+                st.info("💡 Please check your stock symbol and try again. Make sure you have internet connection.")
 
 # Footer
 st.markdown("---")
