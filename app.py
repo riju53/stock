@@ -19,7 +19,7 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📈 Tathagata your Stock Market Advisior")
+st.title("📈 Tathagata your Stock Market Advisor")
 st.markdown("Analyze Indian and USA stocks using AI agents.")
 
 
