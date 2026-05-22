@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 st.title("📈 Tathagata your Stock Market Advisor")
-st.markdown("Analyze Indian and USA stocks using AI agents.")
+st.markdown("Analyze Indian and USA stocks using AI agents.This app is build for learning purpose.")
 
 
 # =========================================
