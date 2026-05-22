@@ -115,9 +115,11 @@ def get_indian_stock_price(symbol: str):
 
 
 @tool
+@tool
 def get_indian_stock_details(symbol: str):
     """
     Get Indian company details.
+
     Example:
     TCS.BSE
     INFY.BSE
@@ -128,11 +130,11 @@ def get_indian_stock_details(symbol: str):
 
     Include:
     - Company overview
-    - Business model
-    - CEO
     - Industry
+    - CEO
+    - Products and services
     - Revenue sources
-    - Growth opportunities
+    - Future growth opportunities
     - Risks
     """
 
@@ -153,11 +155,11 @@ def get_usa_stock_details(symbol: str):
 
     Include:
     - Company overview
-    - Business model
-    - CEO
     - Industry
+    - CEO
+    - Products and services
     - Revenue sources
-    - Growth opportunities
+    - Future growth opportunities
     - Risks
     """
 
