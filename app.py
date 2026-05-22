@@ -14,7 +14,7 @@ from langgraph.prebuilt import create_react_agent
 # =========================================
 
 st.set_page_config(
-    page_title="AI Stock Market Agent(Tathagata Nath)",
+    page_title="Tathagata Stock Market Agent",
     page_icon="📈",
     layout="wide"
 )
