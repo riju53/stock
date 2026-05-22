@@ -14,7 +14,7 @@ from langgraph.prebuilt import create_react_agent
 # =========================================
 
 st.set_page_config(
-    page_title="AI Stock Market Agent",
+    page_title="AI Stock Market Agent(Tathagata Nath)",
     page_icon="📈",
     layout="wide"
 )
@@ -306,4 +306,4 @@ st.sidebar.markdown("""
 # =========================================
 
 st.markdown("---")
-st.caption("Built with Streamlit + LangGraph + Groq")
+st.caption("Built with Streamlit + LangGraph + Groq and build by Tathagata Nath)
