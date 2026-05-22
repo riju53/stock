@@ -31,7 +31,8 @@ st.markdown("Analyze Indian and USA stocks using AI agents.")
 os.environ["GROQ_API_KEY"] = "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"
 
 # Finnhub API
-API_KEY = "d87h1n1r01qmhakfpangd87h1n1r01qmhakfpao0"
+FINNHUB_API_KEY = "d87h1n1r01qmhakfpangd87h1n1r01qmhakfpao0"
+API_KEY = FINNHUB_API_KEY
 
 # AlphaVantage API
 ALPHA_VANTAGE_API_KEY = "EXKT5UJD09F47WBW"
