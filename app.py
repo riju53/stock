@@ -9,9 +9,9 @@ from langchain.tools import tool
 from langgraph.prebuilt import create_react_agent
 
 
-# ==============================
-# STREAMLIT PAGE CONFIG
-# ==============================
+# =========================================
+# PAGE CONFIG
+# =========================================
 
 st.set_page_config(
     page_title="AI Stock Market Agent",
@@ -20,12 +20,12 @@ st.set_page_config(
 )
 
 st.title("📈 AI Stock Market Agent")
-st.markdown("Get live stock prices and company insights using AI agents.")
+st.markdown("Analyze Indian and USA stocks using AI agents.")
 
 
-# ==============================
+# =========================================
 # API KEYS
-# ==============================
+# =========================================
 
 # Set your Groq API key here
 os.environ["GROQ_API_KEY"] = "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"
@@ -37,34 +37,45 @@ API_KEY = "d87h1n1r01qmhakfpangd87h1n1r01qmhakfpao0"
 API_KEY1 = "EXKT5UJD09F47WBW"
 
 
-# ==============================
+# =========================================
 # LLM MODEL
-# ==============================
+# =========================================
 
 model = ChatGroq(
     model="openai/gpt-oss-120b",
-    temperature=1.5
+    temperature=1
 )
 
 
-# ==============================
+# =========================================
 # TOOLS
-# ==============================
+# =========================================
 
 @tool
 def get_stock_price(symbol: str):
     """
-    Get live USA stock price using Finnhub API.
-    Example: AAPL, TSLA, NVDA
+    Get USA stock price.
+
+    Example:
+    AAPL
+    TSLA
+    NVDA
     """
 
-    url = f"https://finnhub.io/api/v1/quote?symbol={symbol}&token={API_KEY}"
+    url = (
+        f"https://finnhub.io/api/v1/quote?"
+        f"symbol={symbol}"
+        f"&token={FINNHUB_API_KEY}"
+    )
 
     response = requests.get(url)
     data = response.json()
 
+    if "c" not in data:
+        return f"Unable to fetch stock price for {symbol}"
+
     return f"""
-    Stock: {symbol}
+    USA Stock: {symbol}
 
     Current Price: ${data.get('c')}
     High Price: ${data.get('h')}
@@ -80,16 +91,16 @@ def get_indian_stock_price(symbol: str):
     Get Indian stock market price.
 
     Example:
-    RELIANCE.BSE
     TCS.BSE
     INFY.BSE
+    RELIANCE.BSE
     """
 
     url = (
         f"https://www.alphavantage.co/query?"
         f"function=GLOBAL_QUOTE"
         f"&symbol={symbol}"
-        f"&apikey={API_KEY1}"
+        f"&apikey={ALPHA_VANTAGE_API_KEY}"
     )
 
     response = requests.get(url)
@@ -99,7 +110,7 @@ def get_indian_stock_price(symbol: str):
         quote = data["Global Quote"]
 
         return f"""
-        Stock: {symbol}
+        Indian Stock: {symbol}
 
         Current Price: ₹{quote['05. price']}
         Open Price: ₹{quote['02. open']}
@@ -110,117 +121,95 @@ def get_indian_stock_price(symbol: str):
         Change Percent: {quote['10. change percent']}
         """
 
-    except Exception as e:
-        return f"Error fetching stock data: {e}"
+    except Exception:
+        return f"Unable to fetch Indian stock data for {symbol}"
 
 
 @tool
-@tool
-def get_indian_stock_details(symbol: str):
+def get_company_details(company_name: str):
     """
-    Get Indian company details.
+    Generate detailed company analysis.
 
     Example:
-    TCS.BSE
-    INFY.BSE
-    """
-
-    return f"""
-    Generate detailed company information about {symbol}.
-
-    Include:
-    - Company overview
-    - Industry
-    - CEO
-    - Products and services
-    - Revenue sources
-    - Future growth opportunities
-    - Risks
-    """
-
-
-@tool
-def get_usa_stock_details(symbol: str):
-    """
-    Get USA company details.
-
-    Example:
+    TCS
     AAPL
     TSLA
-    NVDA
     """
 
     return f"""
-    Generate detailed company information about {symbol}.
+    Generate detailed analysis for company {company_name}
 
     Include:
     - Company overview
-    - Industry
     - CEO
+    - Industry
     - Products and services
     - Revenue sources
+    - Market position
     - Future growth opportunities
     - Risks
+    - Investment insights
     """
 
 
-# ==============================
-# USER INPUT
-# ==============================
+# =========================================
+# AGENT PROMPT
+# =========================================
 
-col1, col2 = st.columns(2)
-
-with col1:
-    stock_name = st.text_input(
-        "Enter Stock Name",
-        value="TCS"
-    )
-
-with col2:
-    market = st.selectbox(
-        "Select Market",
-        ["Indian Stock", "USA Stock"]
-    )
-
-
-# ==============================
-# CREATE AGENT
-# ==============================
-
-prompt = f"""
+prompt = """
 You are an expert stock market advisor.
 
-Provide:
-1. Stock name
-2. Current stock price
-3. High price
-4. Low price
-5. Open price
-6. Previous close
-7. Company overview
-8. Investment insights
-9. Risks
-10. Future growth opportunities
+Your tasks:
+- Fetch stock prices
+- Explain company details
+- Analyze stock performance
+- Give investment insights
+- Explain future opportunities and risks
 
-Keep the explanation under 1000 words.
+Always use tools whenever stock information is requested.
 """
 
+
+# =========================================
+# CREATE AGENT
+# =========================================
 
 agent = create_react_agent(
     model=model,
     tools=[
         get_stock_price,
         get_indian_stock_price,
-        get_indian_stock_details,
-        get_usa_stock_details
+        get_company_details
     ],
     prompt=prompt
 )
 
 
-# ==============================
-# BUTTON ACTION
-# ==============================
+# =========================================
+# USER INPUT
+# =========================================
+
+col1, col2 = st.columns(2)
+
+with col1:
+    stock_name = st.text_input(
+        "Enter Stock Symbol",
+        value="TCS"
+    )
+
+with col2:
+    market = st.selectbox(
+        "Select Market",
+        [
+            "Indian Stock",
+            "USA Stock"
+        ]
+    )
+
+
+# =========================================
+# ANALYZE BUTTON
+# =========================================
 
 if st.button("🚀 Analyze Stock"):
 
@@ -228,38 +217,71 @@ if st.button("🚀 Analyze Stock"):
 
         try:
 
+            # Indian Stocks
             if market == "Indian Stock":
+
+                symbol = f"{stock_name}.BSE"
+
                 user_query = f"""
-                What is the current stock price and company analysis of {stock_name}.BSE
+                Give complete stock analysis of {symbol}
+
+                Include:
+                - current price
+                - open price
+                - high price
+                - low price
+                - previous close
+                - volume
+                - company overview
+                - investment insights
+                - future growth opportunities
                 """
 
+            # USA Stocks
             else:
+
+                symbol = stock_name
+
                 user_query = f"""
-                What is the current stock price and company analysis of {stock_name}
+                Give complete stock analysis of {symbol}
+
+                Include:
+                - current price
+                - open price
+                - high price
+                - low price
+                - previous close
+                - company overview
+                - investment insights
+                - future growth opportunities
                 """
 
+            # Agent Invocation
             response = agent.invoke(
-             {
+                {
                     "messages": [
                         ("user", user_query)
                     ]
                 }
             )
 
+            # Final Output
             final_response = response["messages"][-1].content
 
             st.success("Analysis Complete ✅")
 
             st.markdown("## 📊 Stock Analysis")
+
             st.write(final_response)
 
         except Exception as e:
-            st.error(f"Error: {e}")
+
+            st.error(f"Error: {str(e)}")
 
 
-# ==============================
+# =========================================
 # SIDEBAR
-# ==============================
+# =========================================
 
 st.sidebar.title("📌 Example Stocks")
 
@@ -278,9 +300,9 @@ st.sidebar.markdown("""
 """)
 
 
-# ==============================
+# =========================================
 # FOOTER
-# ==============================
+# =========================================
 
 st.markdown("---")
-st.caption("Built using Streamlit + LangGraph + Groq")
+st.caption("Built with Streamlit + LangGraph + Groq")
