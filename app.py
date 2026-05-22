@@ -34,7 +34,8 @@ os.environ["GROQ_API_KEY"] = "gsk_oIJCPVPPNcFXSBbZ8szMWGdyb3FY9lrtAMkA6Two122P9N
 API_KEY = "d87h1n1r01qmhakfpangd87h1n1r01qmhakfpao0"
 
 # AlphaVantage API
-API_KEY1 = "G1KWHKEHXDZ1HU6A"
+ALPHA_VANTAGE_API_KEY = "EXKT5UJD09F47WBW"
+API_KEY1 = ALPHA_VANTAGE_API_KEY
 
 
 # =========================================
