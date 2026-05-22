@@ -261,10 +261,10 @@ st.sidebar.title("📌 Example Stocks")
 
 st.sidebar.markdown("""
 ### 🇮🇳 Indian Stocks
-- TCS.BSE
-- INFY.BSE
-- RELIANCE.BSE
-- HDFCBANK.BSE
+- TCS
+- INFY
+- RELIANCE
+- HDFCBANK
 
 ### 🇺🇸 USA Stocks
 - AAPL
