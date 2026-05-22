@@ -239,8 +239,10 @@ if st.button("🚀 Analyze Stock"):
                 """
 
             response = agent.invoke(
-                {
-                    "input": user_query
+             {
+                    "messages": [
+                        ("user", user_query)
+                    ]
                 }
             )
 
