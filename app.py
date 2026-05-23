@@ -21,9 +21,9 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("📈 Tathagata Financial Market Adisior")
+st.title("📈 Tathagata Financial Market Advisor")
 st.markdown(
-    "Analyze Indian stocks, USA stocks, and mutual funds using AI."
+    "Analyze Indian stocks, USA stocks, and Mutual funds using AI."
 )
 
 
