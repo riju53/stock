@@ -524,6 +524,6 @@ st.sidebar.markdown("""
 st.markdown("---")
 
 st.caption(
-    "Built with Streamlit + LangGraph + Groq "
+    "Built with Streamlit + LangChain + Groq "
     "by Tathagata Nath"
 )
