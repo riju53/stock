@@ -42,7 +42,7 @@ st.markdown(
 
 # Set your Groq API key here
 #os.environ["GROQ_API_KEY"] = "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"
-os.environ["GROQ_API_KEY"] = "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"
+os.environ["GROQ_API_KEY"] = "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"
 
 # Finnhub API
 FINNHUB_API_KEY = "d87h1n1r01qmhakfpangd87h1n1r01qmhakfpao0"
