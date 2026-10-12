@@ -26,22 +26,6 @@ st.markdown(
     "Analyze Indian stocks, USA stocks, and Mutual funds using AI."
 )
 
-
-# =========================================
-# API KEYS
-# =========================================
-
-# Set Groq API Key
-#os.environ["GROQ_API_KEY"] = "YOUR_GROQ_API_KEY"
-
-# Finnhub API Key
-#FINNHUB_API_KEY = "YOUR_FINNHUB_API_KEY"
-
-# Alpha Vantage API Key
-#ALPHA_VANTAGE_API_KEY = "YOUR_ALPHA_VANTAGE_API_KEY"
-
-# Set your Groq API key here
-#os.environ["GROQ_API_KEY"] = "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"
 os.environ["GROQ_API_KEY"] = "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"
 groq_api_key = st.secrets["GROQ_API_KEY"]
 
@@ -60,7 +44,7 @@ API_KEY1 = ALPHA_VANTAGE_API_KEY
 
 model = ChatGroq(
     model="openai/gpt-oss-120b",
-    goq_api_key = groq_api_key,
+    api_key = groq_api_key,
     temperature=0.7
 )
 
